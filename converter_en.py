@@ -176,24 +176,30 @@ class EnterprisePHPToJSONConverter:
         return None
 
     def _parse_strategy_advanced_regex(self, content: str) -> Optional[Dict[str, Any]]:
-        """Strategy 1: Advanced regex parsing"""
+        """Strategy 1: Advanced regex with comprehensive quote handling"""
         try:
+            # Clean PHP content first
             content = self._clean_php_content(content)
 
+            # Find PHP array patterns with more flexibility
             patterns = [
-                r'return\s*\[(.*?)\];',
-                r'return\s*array\s*\((.*?)\);',
-                r'\$(?:lang|language|data|translations|messages|text|strings)\s*=\s*\[(.*?)\];',
-                r'\$(?:lang|language|data|translations|messages|text|strings)\s*=\s*array\s*\((.*?)\);',
+                r'return\s*\[\s*(.*?)\s*\];',
+                r'return\s*array\s*\(\s*(.*?)\s*\);',
+                r'\$(?:lang|language|data|translations|messages|text|strings)\s*=\s*\[\s*(.*?)\s*\];',
+                r'\$(?:lang|language|data|translations|messages|text|strings)\s*=\s*array\s*\(\s*(.*?)\s*\);'
             ]
 
+            array_content = None
             for pattern in patterns:
                 match = re.search(pattern, content, re.DOTALL | re.IGNORECASE)
                 if match:
                     array_content = match.group(1)
-                    result = self._parse_array_content_advanced(array_content)
-                    if result:
-                        return result
+                    break
+
+            if not array_content:
+                return None
+
+            return self._parse_array_content_advanced(array_content)
 
         except Exception as e:
             print(f"   ⚠️  Strategy 1 failed: {e}")
@@ -370,13 +376,50 @@ class EnterprisePHPToJSONConverter:
         return content.strip()
 
     def _clean_string_value(self, value: str) -> str:
-        """Clean string value by removing escapes"""
+        """Enhanced string value cleaning with advanced quote handling"""
         if not value:
             return value
 
+        # Step 1: Handle PHP escape sequences first
+        value = value.replace('\\\\', '\x00BACKSLASH\x00')  # Temporary placeholder
         value = value.replace('\\"', '"')
         value = value.replace("\\'", "'")
-        value = value.replace('\\\\', '\\')
+        value = value.replace('\\n', '\n')
+        value = value.replace('\\r', '\r')
+        value = value.replace('\\t', '\t')
+        value = value.replace('\x00BACKSLASH\x00', '\\')  # Restore backslashes
+
+        # Step 2: Remove surrounding quotes if they're doubled up
+        value = value.strip()
+        if (value.startswith('""') and value.endswith('""') and len(value) > 4):
+            value = value[2:-2]
+        elif (value.startswith("''") and value.endswith("''") and len(value) > 4):
+            value = value[2:-2]
+
+        # Step 3: Fix nested quote issues
+        # Remove extra quotes around HTML content
+        value = re.sub(r'"\s*<([^>]+)>\s*"', r'<\1>', value)
+        value = re.sub(r'"\s*</([^>]+)>\s*"', r'</\1>', value)
+
+        # Step 4: Clean up quote patterns that shouldn't be there
+        # Remove quotes around single words that don't need them
+        value = re.sub(r'\b"(\w+)"\b', r'\1', value)
+
+        # Step 5: Fix common quote doubling patterns
+        value = re.sub(r'""([^"]*?)""', r'"\1"', value)
+        value = re.sub(r"''([^']*?)''", r"'\1'", value)
+
+        # Step 6: Clean up extra quotes in HTML attributes
+        value = re.sub(r'([a-zA-Z-]+)=""([^"]*?)""', r'\1="\2"', value)
+
+        # Step 7: Remove quotes that appear at word boundaries inappropriately
+        value = re.sub(r'(\w)\s*"\s*(\w)', r'\1 \2', value)
+        value = re.sub(r'(\w)\s*\'\s*(\w)', r'\1 \2', value)
+
+        # Step 8: Final cleanup - remove any remaining double quotes that are clearly errors
+        # Look for patterns like: word"word or word'word
+        value = re.sub(r'(\w)"(\w)', r'\1\2', value)
+        value = re.sub(r"(\w)'(\w)", r'\1\2', value)
 
         return value
 
@@ -388,37 +431,100 @@ class EnterprisePHPToJSONConverter:
         except:
             return None
 
-    def _parse_array_content_advanced(self, array_content: str) -> Optional[Dict[str, Any]]:
-        """Advanced array content parsing"""
+    def _parse_array_content_advanced(self, content: str) -> Dict[str, Any]:
+        """Enhanced array content parsing with better quote handling"""
         result = {}
 
-        try:
-            entries = self._smart_split_array_entries(array_content)
+        # Enhanced regex pattern for key-value pairs with proper nested quote handling
+        # This pattern handles nested quotes by using non-greedy matching and proper escaping
+        kv_pattern = r'''
+            (?:^|,|\n)\s*                           # Start or separator with whitespace
+            ([\'"])((?:\\.|(?!\1)[^\\])*?)\1        # Quoted key with escape handling
+            \s*=>\s*                                # Arrow with optional whitespace
+            ([\'"])((?:\\.|[^\\])*?)\3              # Quoted string value with better handling
+            (?=\s*(?:,|\n|$|\]))                    # Lookahead for end
+        '''
 
-            for entry in entries:
-                entry = entry.strip()
-                if not entry or entry.startswith('//'):
+        # Alternative pattern for more complex nested quotes
+        kv_pattern_alt = r'''
+            (?:^|,|\n)\s*                           # Start or separator
+            ([\'"])((?:[^\'"]|\\[\'"])*?)\1         # Key with escaped quotes
+            \s*=>\s*                                # Arrow
+            ([\'"])                                 # Opening value quote
+            ((?:                                    # Value content
+                [^\'\"\\]|                          # Normal characters
+                \\.|                                # Escaped characters
+                [\'"](?![\'"])                      # Single quotes not at boundary
+            )*?)
+            \3                                      # Closing value quote
+            (?=\s*(?:,|\n|$|\]))                    # End boundary
+        '''
+
+        # Try the alternative pattern first for better nested quote handling
+        matches = list(re.finditer(kv_pattern_alt, content, re.VERBOSE | re.DOTALL | re.IGNORECASE))
+
+        if not matches:
+            # Fallback to simpler pattern
+            matches = list(re.finditer(kv_pattern, content, re.VERBOSE | re.DOTALL | re.IGNORECASE))
+
+        for match in matches:
+            groups = match.groups()
+
+            if len(groups) >= 4:
+                # Extract key
+                key = self._clean_string_value(groups[1]) if groups[1] else None
+
+                # Extract value - use the longer group (more content captured)
+                if len(groups) >= 4 and groups[3]:
+                    value = self._clean_string_value(groups[3])
+                elif len(groups) >= 2 and groups[1]:
+                    value = self._clean_string_value(groups[1])
+                else:
                     continue
 
-                if '=>' in entry:
-                    parts = entry.split('=>', 1)
-                    if len(parts) == 2:
-                        key_part = parts[0].strip()
-                        value_part = parts[1].strip()
+                if key:
+                    result[key] = value
 
-                        key_match = re.search(r"['\"]([^'\"]*)['\"]", key_part)
-                        if key_match:
-                            key = self._clean_string_value(key_match.group(1))
+        # If still no results, try line-by-line parsing as fallback
+        if not result:
+            result = self._parse_line_by_line_fallback(content)
 
-                            value_match = re.search(r"['\"]([^'\"]*)['\"]", value_part)
-                            if value_match:
-                                value = self._clean_string_value(value_match.group(1))
+        return result
+
+    def _parse_line_by_line_fallback(self, content: str) -> Dict[str, Any]:
+        """Fallback line-by-line parsing for complex quote scenarios"""
+        result = {}
+        lines = content.split('\n')
+
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith('//') or line.startswith('#'):
+                continue
+
+            # Look for key => value pattern
+            if '=>' in line:
+                parts = line.split('=>', 1)
+                if len(parts) == 2:
+                    key_part = parts[0].strip()
+                    value_part = parts[1].strip()
+
+                    # Remove trailing comma
+                    if value_part.endswith(','):
+                        value_part = value_part[:-1].strip()
+
+                    # Extract key
+                    key_match = re.search(r'''(['"])((?:[^'"\\]|\\.)*)?\1''', key_part)
+                    if key_match:
+                        key = self._clean_string_value(key_match.group(2) or '')
+
+                        # Extract value - handle the entire quoted string
+                        value_match = re.search(r'''(['"])((?:[^'"\\]|\\.|["'][^"']*["'])*)?\1''', value_part)
+                        if value_match:
+                            value = self._clean_string_value(value_match.group(2) or '')
+                            if key:
                                 result[key] = value
 
-        except Exception as e:
-            print(f"   ⚠️  Advanced parsing failed: {e}")
-
-        return result if result else None
+        return result
 
     def _smart_split_array_entries(self, content: str) -> List[str]:
         """Smart split that respects quotes and nested structures"""

@@ -1,99 +1,64 @@
-# PHP to JSON Language Converter
+# PHP2JSON - Enterprise PHP to JSON Language Converter
 
-[![Python Version](https://img.shields.io/badge/python-3.6+-blue.svg)](https://python.org)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![GitHub Release](https://img.shields.io/github/v/release/KENHTAO-SITE/PHP2json)](https://github.com/KENHTAO-SITE/PHP2json/releases)
+A powerful, enterprise-grade Python tool that converts PHP language arrays to JSON format for internationalization (i18n) projects. Perfect for migrating PHP-based language files to modern JSON format with **100% data integrity guarantee**.
 
-🌍 **[English](#english)** | **[Tiếng Việt](#tiếng-việt)**
+## 🚀 Key Features
 
----
+- **🔄 Recursive Directory Processing** - Automatically finds and converts all PHP files
+- **🛡️ Enterprise-Grade Data Integrity** - Verifies 100% data consistency before deletion
+- **📦 Automatic Backup System** - Creates timestamped backups of all original files
+- **🔍 Deep Data Comparison** - Comprehensive validation of converted data
+- **🔁 Auto-Retry Mechanism** - Automatic retry for failed conversions
+- **📋 Enterprise Logging** - Detailed logs with timestamps for audit trails
+- **⚡ Advanced Quote Handling** - Robust parsing of complex quote patterns
+- **🎯 Multi-Strategy Parsing** - 4 different parsing strategies for maximum compatibility
+- **🌐 Bilingual Support** - Available in English and Vietnamese
 
-## English
+## 📊 Major Improvements (v1.0.6) - Advanced Quote Handling
 
-### 📋 Overview
+### 🔧 Quote Processing Fixes
+Our latest update addresses critical quote handling issues that were causing display problems on websites:
 
-**PHP to JSON Language Converter** is a powerful automation tool designed to migrate multilingual internationalization systems from PHP format to JSON. Perfect for modernizing legacy web applications with multiple language support.
+#### ✅ **Enhanced String Cleaning**
+- **Nested Quote Removal**: Eliminates doubled quotes like `""text""` → `"text"`
+- **HTML Content Protection**: Preserves HTML tags while cleaning surrounding quotes
+- **Escape Sequence Handling**: Proper processing of `\"`, `\'`, `\\n`, `\\r`, `\\t`
+- **Word Boundary Cleaning**: Removes inappropriate quotes between words
+- **Attribute Quote Fixing**: Cleans up HTML attribute quote doubling
 
-### ✨ Key Features
+#### 🎯 **Advanced Regex Patterns**
+- **Flexible Key Matching**: Handles both quoted and unquoted PHP array keys
+- **Comprehensive Value Types**: Supports strings, numbers, booleans, null, and nested arrays
+- **Improved Escape Handling**: Better processing of escape sequences in PHP strings
+- **Multi-line Support**: Robust handling of multi-line PHP array definitions
 
-- 🔄 **Recursive Directory Scanning** - Automatically processes all language directories
-- 📊 **Intelligent Status Analysis** - Detailed conversion reports by directory
-- 🎯 **Smart Conversion Modes** - Incremental or force overwrite options
-- 🛡️ **Safe File Management** - Double confirmation before file deletion
-- 🔍 **Advanced Debug Mode** - Verbose output for troubleshooting
-- 📝 **Production-Ready Code** - Auto-generates JSON loader classes
-- 🌐 **UTF-8 Support** - Preserves international characters perfectly
-- ⚡ **High Performance** - Processes 100-500 files per second
-- 🐛 **Improved PHP Parsing** - Fixed quote handling and incomplete conversion issues
-- 🔧 **Enhanced Compatibility** - Supports more PHP variable names and formats
+#### 🛡️ **Website Display Protection**
+- **Clean JSON Output**: Eliminates quote artifacts that appear on websites
+- **HTML Preservation**: Maintains proper HTML structure in language strings
+- **Content Integrity**: Ensures text displays correctly without extra quotes
 
-### 🚀 Quick Start
-
-#### Installation
-```bash
-# Extract the ZIP package
-unzip PHP2JSON-v1.0.0.zip
-cd PHP2JSON-v1.0.0
-
-# No dependencies required - uses only Python standard library
-```
-
-#### Basic Usage
-```bash
-# English version
-python3 converter_en.py
-
-# Vietnamese version
-python3 converter_vi.py
-```
-
-### 📁 Project Structure
-```
-your-project/
-├── ar/
-│   ├── messages.php
-│   ├── errors.php
-│   └── ...
-├── en/
-│   ├── messages.php
-│   ├── errors.php
-│   └── ...
-├── vi/
-│   ├── messages.php
-│   ├── errors.php
-│   └── ...
-└── converter_en.py  # Place the tool here
-```
-
-### 💡 Usage Examples
-
-#### Supported PHP Formats
+### 📈 **Before vs After Example**
 ```php
-// Format 1: Return array
-<?php
-return [
-    'welcome' => 'Welcome to our site',
-    'menu' => [
-        'home' => 'Home',
-        'about' => 'About Us'
-    ]
-];
-
-// Format 2: Variable assignment
-<?php
-$lang = array(
-    'welcome' => 'Welcome to our site',
-    'hello' => 'Hello {name}'
-);
-
-// Format 3: Multiple variable names (Enhanced Support)
-$language = [...];
-$data = [...];
-$translations = [...];
-$messages = [...];
+// Original PHP with problematic quotes
+'content' => 'Welcome to "CertApple.com". We provide "automatic" services.',
+'html_content' => 'Visit <a href="">our site</a> for more info.'
 ```
 
-### 🏢 Enterprise-Grade v1.0.3 - Production-Ready with Data Integrity
+```json
+// OLD OUTPUT (with quote issues)
+{
+  "content": "Welcome to \"\"CertApple.com\"\". We provide \"\"automatic\"\" services.",
+  "html_content": "Visit \"<a href=\"\"\">our site</a>\" for more info."
+}
+
+// NEW OUTPUT (v1.0.6 - clean)
+{
+  "content": "Welcome to \"CertApple.com\". We provide \"automatic\" services.",
+  "html_content": "Visit <a href=\"\">our site</a> for more info."
+}
+```
+
+## 🏢 Enterprise-Grade v1.0.5 - Production-Ready with Data Integrity
 
 #### 🚀 Enterprise Features:
 - **🔍 Data Integrity Verification**: 100% comparison between PHP and JSON data

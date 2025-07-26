@@ -176,24 +176,30 @@ class EnterprisePHPToJSONConverter:
         return None
 
     def _parse_strategy_advanced_regex(self, content: str) -> Optional[Dict[str, Any]]:
-        """Chiến lược 1: Advanced regex parsing"""
+        """Chiến lược 1: Regex nâng cao với xử lý toàn diện dấu ngoặc kép"""
         try:
+            # Làm sạch PHP content trước
             content = self._clean_php_content(content)
 
+            # Tìm PHP array patterns với tính linh hoạt cao hơn
             patterns = [
-                r'return\s*\[(.*?)\];',
-                r'return\s*array\s*\((.*?)\);',
-                r'\$(?:lang|language|data|translations|messages|text|strings)\s*=\s*\[(.*?)\];',
-                r'\$(?:lang|language|data|translations|messages|text|strings)\s*=\s*array\s*\((.*?)\);',
+                r'return\s*\[\s*(.*?)\s*\];',
+                r'return\s*array\s*\(\s*(.*?)\s*\);',
+                r'\$(?:lang|language|data|translations|messages|text|strings)\s*=\s*\[\s*(.*?)\s*\];',
+                r'\$(?:lang|language|data|translations|messages|text|strings)\s*=\s*array\s*\(\s*(.*?)\s*\);'
             ]
 
+            array_content = None
             for pattern in patterns:
                 match = re.search(pattern, content, re.DOTALL | re.IGNORECASE)
                 if match:
                     array_content = match.group(1)
-                    result = self._parse_array_content_advanced(array_content)
-                    if result:
-                        return result
+                    break
+
+            if not array_content:
+                return None
+
+            return self._parse_array_content_advanced(array_content)
 
         except Exception as e:
             print(f"   ⚠️  Chiến lược 1 thất bại: {e}")
@@ -370,13 +376,50 @@ class EnterprisePHPToJSONConverter:
         return content.strip()
 
     def _clean_string_value(self, value: str) -> str:
-        """Làm sạch string value bằng cách xóa escapes"""
+        """Làm sạch giá trị chuỗi với xử lý nâng cao các dấu ngoặc kép"""
         if not value:
             return value
 
+        # Bước 1: Xử lý PHP escape sequences trước
+        value = value.replace('\\\\', '\x00BACKSLASH\x00')  # Placeholder tạm thời
         value = value.replace('\\"', '"')
         value = value.replace("\\'", "'")
-        value = value.replace('\\\\', '\\')
+        value = value.replace('\\n', '\n')
+        value = value.replace('\\r', '\r')
+        value = value.replace('\\t', '\t')
+        value = value.replace('\x00BACKSLASH\x00', '\\')  # Khôi phục backslashes
+
+        # Bước 2: Loại bỏ dấu ngoặc bao quanh nếu bị lặp
+        value = value.strip()
+        if (value.startswith('""') and value.endswith('""') and len(value) > 4):
+            value = value[2:-2]
+        elif (value.startswith("''") and value.endswith("''") and len(value) > 4):
+            value = value[2:-2]
+
+        # Bước 3: Sửa các vấn đề nested quotes
+        # Loại bỏ dấu ngoặc thừa xung quanh HTML content
+        value = re.sub(r'"\s*<([^>]+)>\s*"', r'<\1>', value)
+        value = re.sub(r'"\s*</([^>]+)>\s*"', r'</\1>', value)
+
+        # Bước 4: Làm sạch các pattern dấu ngoặc không cần thiết
+        # Loại bỏ dấu ngoặc xung quanh từ đơn không cần
+        value = re.sub(r'\b"(\w+)"\b', r'\1', value)
+
+        # Bước 5: Sửa các pattern dấu ngoặc bị lặp
+        value = re.sub(r'""([^"]*?)""', r'"\1"', value)
+        value = re.sub(r"''([^']*?)''", r"'\1'", value)
+
+        # Bước 6: Làm sạch dấu ngoặc thừa trong HTML attributes
+        value = re.sub(r'([a-zA-Z-]+)=""([^"]*?)""', r'\1="\2"', value)
+
+        # Bước 7: Loại bỏ dấu ngoặc xuất hiện không đúng chỗ
+        value = re.sub(r'(\w)\s*"\s*(\w)', r'\1 \2', value)
+        value = re.sub(r'(\w)\s*\'\s*(\w)', r'\1 \2', value)
+
+        # Bước 8: Làm sạch cuối cùng - loại bỏ dấu ngoặc kép thừa
+        # Tìm các pattern như: word"word hoặc word'word
+        value = re.sub(r'(\w)"(\w)', r'\1\2', value)
+        value = re.sub(r"(\w)'(\w)", r'\1\2', value)
 
         return value
 
@@ -388,37 +431,100 @@ class EnterprisePHPToJSONConverter:
         except:
             return None
 
-    def _parse_array_content_advanced(self, array_content: str) -> Optional[Dict[str, Any]]:
-        """Advanced array content parsing"""
+    def _parse_array_content_advanced(self, content: str) -> Dict[str, Any]:
+        """Phân tích nội dung mảng nâng cao với xử lý dấu ngoặc tốt hơn"""
         result = {}
 
-        try:
-            entries = self._smart_split_array_entries(array_content)
+        # Pattern regex nâng cao cho key-value pairs với xử lý nested quotes đúng cách
+        # Pattern này xử lý nested quotes bằng cách sử dụng non-greedy matching và escaping đúng
+        kv_pattern = r'''
+            (?:^|,|\n)\s*                           # Bắt đầu hoặc dấu phân cách với khoảng trắng
+            ([\'"])((?:\\.|(?!\1)[^\\])*?)\1        # Key có dấu ngoặc với xử lý escape
+            \s*=>\s*                                # Mũi tên với khoảng trắng tùy chọn
+            ([\'"])((?:\\.|[^\\])*?)\3              # Giá trị chuỗi có dấu ngoặc với xử lý tốt hơn
+            (?=\s*(?:,|\n|$|\]))                    # Lookahead cho kết thúc
+        '''
 
-            for entry in entries:
-                entry = entry.strip()
-                if not entry or entry.startswith('//'):
+        # Pattern thay thế cho nested quotes phức tạp hơn
+        kv_pattern_alt = r'''
+            (?:^|,|\n)\s*                           # Bắt đầu hoặc dấu phân cách
+            ([\'"])((?:[^\'"]|\\[\'"])*?)\1         # Key với escaped quotes
+            \s*=>\s*                                # Mũi tên
+            ([\'"])                                 # Dấu ngoặc mở của value
+            ((?:                                    # Nội dung value
+                [^\'\"\\]|                          # Ký tự bình thường
+                \\.|                                # Ký tự escaped
+                [\'"](?![\'"])                      # Dấu ngoặc đơn không ở boundary
+            )*?)
+            \3                                      # Dấu ngoặc đóng của value
+            (?=\s*(?:,|\n|$|\]))                    # Boundary kết thúc
+        '''
+
+        # Thử pattern thay thế trước để xử lý nested quotes tốt hơn
+        matches = list(re.finditer(kv_pattern_alt, content, re.VERBOSE | re.DOTALL | re.IGNORECASE))
+
+        if not matches:
+            # Fallback sang pattern đơn giản hơn
+            matches = list(re.finditer(kv_pattern, content, re.VERBOSE | re.DOTALL | re.IGNORECASE))
+
+        for match in matches:
+            groups = match.groups()
+
+            if len(groups) >= 4:
+                # Trích xuất key
+                key = self._clean_string_value(groups[1]) if groups[1] else None
+
+                # Trích xuất value - sử dụng group dài hơn (nội dung được capture nhiều hơn)
+                if len(groups) >= 4 and groups[3]:
+                    value = self._clean_string_value(groups[3])
+                elif len(groups) >= 2 and groups[1]:
+                    value = self._clean_string_value(groups[1])
+                else:
                     continue
 
-                if '=>' in entry:
-                    parts = entry.split('=>', 1)
-                    if len(parts) == 2:
-                        key_part = parts[0].strip()
-                        value_part = parts[1].strip()
+                if key:
+                    result[key] = value
 
-                        key_match = re.search(r"['\"]([^'\"]*)['\"]", key_part)
-                        if key_match:
-                            key = self._clean_string_value(key_match.group(1))
+        # Nếu vẫn không có kết quả, thử parsing từng dòng như fallback
+        if not result:
+            result = self._parse_line_by_line_fallback(content)
 
-                            value_match = re.search(r"['\"]([^'\"]*)['\"]", value_part)
-                            if value_match:
-                                value = self._clean_string_value(value_match.group(1))
+        return result
+
+    def _parse_line_by_line_fallback(self, content: str) -> Dict[str, Any]:
+        """Fallback parsing từng dòng cho các trường hợp dấu ngoặc phức tạp"""
+        result = {}
+        lines = content.split('\n')
+
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith('//') or line.startswith('#'):
+                continue
+
+            # Tìm pattern key => value
+            if '=>' in line:
+                parts = line.split('=>', 1)
+                if len(parts) == 2:
+                    key_part = parts[0].strip()
+                    value_part = parts[1].strip()
+
+                    # Loại bỏ dấu phẩy cuối
+                    if value_part.endswith(','):
+                        value_part = value_part[:-1].strip()
+
+                    # Trích xuất key
+                    key_match = re.search(r'''(['"])((?:[^'"\\]|\\.)*)?\1''', key_part)
+                    if key_match:
+                        key = self._clean_string_value(key_match.group(2) or '')
+
+                        # Trích xuất value - xử lý toàn bộ chuỗi có dấu ngoặc
+                        value_match = re.search(r'''(['"])((?:[^'"\\]|\\.|["'][^"'])*)?\1''', value_part)
+                        if value_match:
+                            value = self._clean_string_value(value_match.group(2) or '')
+                            if key:
                                 result[key] = value
 
-        except Exception as e:
-            print(f"   ⚠️  Advanced parsing thất bại: {e}")
-
-        return result if result else None
+        return result
 
     def _smart_split_array_entries(self, content: str) -> List[str]:
         """Smart split tôn trọng quotes và nested structures"""
