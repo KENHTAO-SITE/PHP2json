@@ -41,7 +41,7 @@ cd PHP2JSON-v1.0.0
 # English version
 python3 converter_en.py
 
-# Vietnamese version  
+# Vietnamese version
 python3 converter_vi.py
 ```
 
@@ -216,6 +216,27 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Bug Reports**: [Open an issue](https://github.com/KENHTAO-SITE/PHP2json/issues)
 - **Feature Requests**: [Discussions](https://github.com/KENHTAO-SITE/PHP2json/discussions)
 - **Documentation**: [Wiki](https://github.com/KENHTAO-SITE/PHP2json/wiki)
+
+---
+
+## 👨‍💻 Credits & Author
+
+**Created by**: **Kênh Táo**
+
+### 📞 Contact Information
+- 📱 **Telegram**: [@QTUNUy](https://t.me/QTUNUy)
+- 🌐 **Websites**:
+  - [CertApple.com](https://certapple.com)
+  - [Kenhtao.net](https://kenhtao.net)
+  - [kenhtao.site](https://kenhtao.site)
+  - [iPA.KenhTao.net](https://ipa.kenhtao.net)
+
+### 💝 Support the Project
+If this tool helps you, please consider:
+- ⭐ **Star** this repository
+- 🔄 **Share** with your developer community
+- 💬 **Follow** on Telegram for updates
+- 🌟 **Visit** our websites for more tools
 
 ---
 
