@@ -24,6 +24,8 @@
 - 📝 **Production-Ready Code** - Auto-generates JSON loader classes
 - 🌐 **UTF-8 Support** - Preserves international characters perfectly
 - ⚡ **High Performance** - Processes 100-500 files per second
+- 🐛 **Improved PHP Parsing** - Fixed quote handling and incomplete conversion issues
+- 🔧 **Enhanced Compatibility** - Supports more PHP variable names and formats
 
 ### 🚀 Quick Start
 
@@ -84,11 +86,26 @@ $lang = array(
     'hello' => 'Hello {name}'
 );
 
-// Format 3: Multiple variable names
+// Format 3: Multiple variable names (Enhanced Support)
 $language = [...];
 $data = [...];
 $translations = [...];
+$messages = [...];
 ```
+
+### 🐛 Recent Bug Fixes (v1.0.1)
+
+#### Fixed Issues:
+- **❌ Quote Handling Problem**: Resolved extra quotes in JSON output (e.g., `"example"` instead of `example`)
+- **❌ Incomplete Parsing**: Fixed missing translations due to limited PHP format recognition
+- **❌ Escaped Characters**: Properly handle escaped quotes and special characters
+- **❌ Multi-line Support**: Now correctly processes multi-line string values
+
+#### Improvements:
+- **✅ Enhanced Regex Parsing**: Advanced pattern matching for complex PHP structures
+- **✅ Better Quote Extraction**: Intelligent quote removal without content loss
+- **✅ Extended Variable Support**: Recognition of `$data`, `$translations`, `$messages` variables
+- **✅ Fallback Mechanism**: Dual parsing approach for maximum compatibility
 
 #### Generated JSON Output
 ```json
