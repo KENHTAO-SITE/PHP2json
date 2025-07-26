@@ -1,0 +1,36 @@
+# PHP2JSON Language Converter - Git Ignore Rules
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Test directories and files
+test_languages/
+test_data/
+sample_php/
+backup/
+
+# Tool generated files
+conversion_report.md
+load_json_example.php
+
+# Log files
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
